@@ -109,9 +109,7 @@ void AuraPitchAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
 {
     pitchEngine.prepare(sampleRate, samplesPerBlock);
     transportSource.prepareToPlay(samplesPerBlock, sampleRate);
-    
-    // LATENCIA CERO REAL (0.0 MS REPORTADA AL DAW)
-    setLatencySamples(0);
+    setLatencySamples(0); // Latencia Cero Real
 }
 
 void AuraPitchAudioProcessor::releaseResources()
@@ -146,6 +144,7 @@ void AuraPitchAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
         transportSource.getNextAudioBlock(info);
     }
 
+    // Leer valores actuales de los perillas del APVTS
     float centerSnap = apvts.getRawParameterValue("CENTER_SNAP")->load();
     float driftCorr  = apvts.getRawParameterValue("DRIFT_CORR")->load();
     float vibrato    = apvts.getRawParameterValue("VIBRATO_PRESERVE")->load();
@@ -157,14 +156,17 @@ void AuraPitchAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     int rootNote     = static_cast<int>(apvts.getRawParameterValue("ROOT_NOTE")->load());
     int scaleType    = static_cast<int>(apvts.getRawParameterValue("SCALE_TYPE")->load());
 
+    // Procesar canal izquierdo (Mono o Estéreo L)
     auto* channelData = buffer.getWritePointer(0);
     float rms = buffer.getRMSLevel(0, 0, numSamples);
     inputLevelDb.store(juce::Decibels::gainToDecibels(rms, -60.0f));
 
+    // LLAMADA ACTIVA AL MOTOR DSP
     pitchEngine.processBlock(channelData, numSamples,
                              driftCorr, centerSnap, vibrato, transition, formant, mixLevel,
                              onsetShape, tubeWarm, rootNote, scaleType);
 
+    // Duplicar canal L hacia R si es estéreo para procesar ambos lados idénticos
     if (totalNumOutputChannels > 1)
     {
         auto* rightChannel = buffer.getWritePointer(1);
